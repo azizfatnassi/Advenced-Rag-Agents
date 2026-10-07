@@ -6,6 +6,7 @@ from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma 
 from langchain_community.embeddings import SentenceTransformerEmbeddings
+from loguru import logger
 
 
 #VECTORSTORE_DIR = os.path.join(os.path.dirname(__file__), "..", "vectorstore")
@@ -45,9 +46,9 @@ def ingest_document(file_path: str , company: str = "unknown", year: str = "unkn
         chunk.metadata["company"]=company
         chunk.metadata["year"]=year
         chunk.metadata["source"]=file_path
-    print(f'split into {len(chunks)} chunks')
-    print(f'Metadata added: company= {company},year={year}')
-    print("Sample chunk metadata:", chunks[0].metadata)
+    logger.info(f'split into {len(chunks)} chunks')
+    logger.info(f'Metadata added: company= {company},year={year}')
+    logger.info(f"Sample chunk metadata:, {chunks[0].metadata}")
 
     embedding_fn = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
 
@@ -59,10 +60,10 @@ def ingest_document(file_path: str , company: str = "unknown", year: str = "unkn
     existing= vectorstore.get()
     if existing["ids"]:
         vectorstore.delete(ids=existing["ids"])
-        print(f"🗑️  Cleared {len(existing['ids'])} old chunks")
+        logger.info(f"🗑️  Cleared {len(existing['ids'])} old chunks")
 
     vectorstore.add_documents(chunks)
-    print(f"✅ Done. {len(chunks)} chunks saved to vectorstore.")
+    logger.info(f"✅ Done. {len(chunks)} chunks saved to vectorstore.")
     
     return vectorstore
 

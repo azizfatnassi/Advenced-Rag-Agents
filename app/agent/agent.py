@@ -55,10 +55,7 @@ def run_agent(agent, question: str, session_id: str = "dev",user_id:str="default
     handler = CallbackHandler()
     preferences = get_preferences_as_text(user_id)
     config={"callbacks":[handler],"configurable":{"thread_id": session_id}}
-    if preferences:
-        full_question= f"{preferences}\n\nQuestion:{question}"
-    else:
-        full_question= question
+    
     try:
         result = agent.invoke(
             {"messages": [{"role": "user", "content": question}]},

@@ -2,12 +2,15 @@
 
 from langchain_community.chat_message_histories import ChatMessageHistory
 
+from app.monitoring.metrics import SESSIONS_CREATED
+
 conversations={}
 
 def get_or_create_memory(session_id:str)->ChatMessageHistory:
     
     if session_id  not in conversations:
         conversations[session_id]=ChatMessageHistory()
+        SESSIONS_CREATED.inc()
 
     return conversations[session_id]
 def get_chat_history_as_string(session_id:str)-> str:
@@ -38,8 +41,8 @@ def get_chat_history_as_string(session_id:str)-> str:
 def save_to_memory(session_id: str,question: str, answer:str):
     
     memory= get_or_create_memory(session_id)
-    memory.add_ai_message(question)
-    memory.add_messages(answer)
+    memory.add_ai_message(answer)
+    memory.add_messages(question)
 
 def clear_memory(session_id: str):
     if session_id in conversations:

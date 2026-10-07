@@ -4,6 +4,7 @@ from typing import Any, Optional, TypedDict
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
+from loguru import logger
 
 from app.agent.classifier import classify_question
 from app.agent.generator import generate_answer
@@ -27,25 +28,25 @@ class RouterState(TypedDict):
 def build_router_graph(vectordb):
 
  def classify_node(state:RouterState)->dict:
-    print(f"[classify_node] classifying: {state['question']}")
+    logger.info(f"[classify_node] classifying: {state['question']}")
     question_type=classify_question(state["question"])
-    print(f"[classify_node] type: {question_type}")
+    logger.info(f"[classify_node] type: {question_type}")
 
     return {"question_type": question_type}
 
  def route_question(state:RouterState)->str:
     destination=f"{state['question_type']}_node"
-    print(f"[router] routing to : {destination}")
+    logger.info(f"[router] routing to : {destination}")
     return destination
 
  def factual_node(state:RouterState)->dict:
-     print(f"[factual_node] running simple retrieval")
+     logger.info(f"[factual_node] running simple retrieval")
      chunks= vectordb.similarity_search(state["question"])
      return {"chunks": chunks}
 
 
  def comparative_node(state: RouterState) -> dict:
-    print(f"[comparative_node] running multi-query retrieval")
+    logger.info(f"[comparative_node] running multi-query retrieval")
     chunks= advanced_retrieval(state["question"],vectordb,k=3)
     reranked=rerank(state["question"], chunks, top_k=3)
     return {"chunks":reranked}
@@ -57,7 +58,7 @@ def build_router_graph(vectordb):
 
 
  def generate_node(state: RouterState) -> dict:
-    print(f"[generate_node] generating answer for type: {state['question_type']}")
+    logger.info(f"[generate_node] generating answer for type: {state['question_type']}")
     answer = generate_answer(
         question=state["question"],
         chunks=state["chunks"],

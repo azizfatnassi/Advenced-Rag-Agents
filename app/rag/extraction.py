@@ -55,14 +55,14 @@ class FinancialMetrics(BaseModel):
 def extract_financial_data(context:str)->FinancialMetrics:
 
     result=client.chat.completions.create(
-        model="openai/gpt-oss-20b",
+        model="openai/gpt-oss-120b",
         response_model=FinancialMetrics,
         max_retries=2,
         messages=[
             {
                 "role":"system",
                 "content":( 
-                    "you are a financial data extraction assistant.extract ony the "
+                    "you are a financial data extraction assistant.extract only the "
                     "financial metrics in the context provided."
                     "do not guess or infer values that are not stated . leave fields empty "
                     "if the information is not present. "

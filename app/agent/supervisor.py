@@ -6,7 +6,15 @@ from langgraph.graph import StateGraph, END
 from app.agent.llm import groq_llm
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.agent.tools import calculate, get_stock_price, search_documents
+from app.agent.tools import calculate, get_last_chunks, get_stock_price, search_documents
+from app.monitoring.metrics import AGENT_ITERATIONS, TOKEN_USAGE
+
+
+def _record_tokens(response, model_name: str, task: str) -> None:
+    if hasattr(response, "usage_metadata") and response.usage_metadata:
+        total_tokens = response.usage_metadata.get("total_tokens")
+        if total_tokens:
+            TOKEN_USAGE.labels(model=model_name, task=task).inc(total_tokens)
 
 
 
@@ -19,10 +27,11 @@ class SupervisorState(TypedDict):
     calculation_output: Optional[str]
     final_answer: Optional[str]
     history:Optional[list[dict]]
+    retrieval_chunks:Optional[str]
     iterations:int
     max_iterations: int 
 
-fast_llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
+fast_llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0)
 
 SUPERVISOR_PROMPT= """you are a supervisor of financial analysis system.
   you have three specialist agents available:
@@ -50,7 +59,7 @@ def supervisor_node(state: SupervisorState)-> dict:
     history=state.get("history") or []
 
     if history :
-         context="Previous conversations"
+         context+="Previous conversations"
          for turn in history[-3:]:
               context+=f"User asked: {turn['question']}\n"
               context+=f"Answer was: {turn['final_answer']}\n"
@@ -69,9 +78,10 @@ def supervisor_node(state: SupervisorState)-> dict:
          HumanMessage(content=context)
     ]
 
-    response= groq_llm.invoke(messages)
+    response = groq_llm.invoke(messages)
+    _record_tokens(response, "openai/gpt-oss-120b", "supervisor_routing")
 
-    raw=response.content.strip()
+    raw = response.content.strip()
  
     next_agent= None
     for line in raw.split("\n"):
@@ -87,7 +97,8 @@ def supervisor_node(state: SupervisorState)-> dict:
 
 def retrieval_agent(state:SupervisorState)->dict:
      result= search_documents.invoke(state["question"])
-     return{"retrieval_output":result}
+     chunks= get_last_chunks()
+     return{"retrieval_output":result,"retrieval_chunks":chunks}
 
 def market_agent(state:SupervisorState)->dict:
 
@@ -96,7 +107,9 @@ def market_agent(state:SupervisorState)->dict:
           HumanMessage(content=state["question"])
      ]
 
-     ticker= fast_llm.invoke(messages).content.strip()
+     ticker_response = fast_llm.invoke(messages)
+     _record_tokens(ticker_response, "openai/gpt-oss-20b", "market_ticker_extraction")
+     ticker = ticker_response.content.strip()
      result= get_stock_price.invoke(ticker)
      return {"market_output": result}
 
@@ -108,7 +121,9 @@ def calculation_agent(state:SupervisorState)->dict:
         HumanMessage(content=f"Context:\n{context}\n\nQuestion: {state['question']}")
     ]
 
-     expression = groq_llm.invoke(messages).content.strip()
+     expr_response = groq_llm.invoke(messages)
+     _record_tokens(expr_response, "openai/gpt-oss-120b", "calculation_expression")
+     expression = expr_response.content.strip()
      result= calculate.invoke(expression)
      return{"calculation_output":result}
 
@@ -135,8 +150,13 @@ def synthesizer_node(state: SupervisorState) -> dict:
         HumanMessage(content=context)
     ]
     
-    answer = fast_llm.invoke(messages).content.strip()
-    updated_history= history +  [{"question": state["question"], "answer": answer}]
+    answer_response = fast_llm.invoke(messages)
+    _record_tokens(answer_response, "openai/gpt-oss-20b", "synthesizer")
+    answer = answer_response.content.strip()
+
+    AGENT_ITERATIONS.observe(state["iterations"])
+
+    updated_history = history + [{"question": state["question"], "final_answer": answer}]
     return {"final_answer": answer,
              "history": updated_history}
 

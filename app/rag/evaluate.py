@@ -2,6 +2,7 @@ import os
 import math
 from dotenv import load_dotenv
 from langchain_cohere import CohereEmbeddings
+from loguru import logger
 from ragas import evaluate, EvaluationDataset, SingleTurnSample
 from ragas.metrics import faithfulness, AnswerRelevancy
 from ragas.llms import LangchainLLMWrapper
@@ -40,8 +41,8 @@ def evaluate_rag(question: str, answer: str, contexts: list) -> dict:
         embeddings=embeddings,
     )
 
-    print("RAW RESULT:", result)
-    print("RAW SCORES:", result.scores)
+    logger.info(f"RAW RESULT: {result}")
+    logger.info(f"RAW SCORES:{result.scores}")
 
     def safe_score(val):
         try:

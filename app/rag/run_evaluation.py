@@ -21,7 +21,7 @@ def get_vectorstore():
 
 def generate_answer(question, chunks):
     context = "\n\n".join([c.page_content for c in chunks])
-    llm = ChatGroq(model="openai/gpt-oss-20b")
+    llm = ChatGroq(model="openai/gpt-oss-120b")
     prompt = ChatPromptTemplate.from_template("""You are a helpful assistant. Use the context to answer.
 
 Context:
